@@ -10,26 +10,36 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
-import type { GraphNodeData, LevelData } from '../types'
+import type { GraphNodeData, LevelData, NarrativeEvent } from '../types'
 import { buildStoryGraph } from '../utils/graphBuilder'
 import { EntityNode } from './EntityNode'
+import { EventNode } from './EventNode'
 import { LevelNode } from './LevelNode'
 
 const nodeTypes = {
   levelNode: LevelNode,
   entityNode: EntityNode,
+  eventNode: EventNode,
 }
 
 interface StoryCanvasProps {
   levelData: LevelData
   dirtyNodes?: string[]
+  events?: NarrativeEvent[]
+  highlightedEventId?: string | null
   onSelectNode: (node: Node<GraphNodeData> | null) => void
 }
 
-export function StoryCanvas({ levelData, dirtyNodes = [], onSelectNode }: StoryCanvasProps) {
+export function StoryCanvas({
+  levelData,
+  dirtyNodes = [],
+  events = [],
+  highlightedEventId = null,
+  onSelectNode,
+}: StoryCanvasProps) {
   const graph = useMemo(
-    () => buildStoryGraph(levelData, dirtyNodes),
-    [levelData, dirtyNodes],
+    () => buildStoryGraph(levelData, dirtyNodes, events),
+    [levelData, dirtyNodes, events],
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(graph.nodes)
@@ -39,6 +49,16 @@ export function StoryCanvas({ levelData, dirtyNodes = [], onSelectNode }: StoryC
     setNodes(graph.nodes)
     setEdges(graph.edges)
   }, [graph, setNodes, setEdges])
+
+  useEffect(() => {
+    if (!highlightedEventId) return
+    setNodes((current) =>
+      current.map((node) => ({
+        ...node,
+        selected: node.id === highlightedEventId,
+      })),
+    )
+  }, [highlightedEventId, setNodes])
 
   const onSelectionChange = useCallback(
     ({ nodes: selected }: { nodes: Node[] }) => {
@@ -67,9 +87,8 @@ export function StoryCanvas({ levelData, dirtyNodes = [], onSelectNode }: StoryC
         <MiniMap
           nodeColor={(node) => {
             const data = node.data as GraphNodeData
-            if (data.kind === 'level') {
-              return (data.color as string) ?? '#475569'
-            }
+            if (data.kind === 'event') return '#a78bfa'
+            if (data.kind === 'level') return (data.color as string) ?? '#475569'
             return '#334155'
           }}
           maskColor="rgba(2, 6, 23, 0.75)"

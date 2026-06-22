@@ -25,6 +25,16 @@ def client(tmp_path: Path):
   return TestClient(app)
 
 
+def test_narrative_timeline_endpoint(client: TestClient):
+  client.post("/api/story/init", json={"story_name": "timeline_story"})
+  response = client.get("/api/story/timeline_story/versions/v1/narrative")
+  assert response.status_code == 200
+  body = response.json()
+  assert body["selected_version"] == "v1"
+  assert body["latest_version"] == "v1"
+  assert body["events"] == []
+
+
 def test_init_story(client: TestClient):
   response = client.post("/api/story/init", json={"story_name": "test_world"})
   assert response.status_code == 200

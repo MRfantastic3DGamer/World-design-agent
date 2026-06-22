@@ -20,6 +20,30 @@ export interface StoryState {
   backpropagation?: Record<string, unknown> | null
 }
 
+export type NarrativeEventType = 'simulation_cycle' | 'retcon_escalation'
+
+export interface NarrativeEvent {
+  id: string
+  type: NarrativeEventType
+  version: string
+  level: number
+  order: number
+  idea?: string | null
+  summary?: string | null
+  reason?: string | null
+  source_level?: number | null
+  synthesis?: Record<string, unknown> | null
+  simulation?: Record<string, unknown> | null
+}
+
+export interface NarrativeTimeline {
+  story_name: string
+  selected_version: string
+  included_versions: string[]
+  latest_version: string
+  events: NarrativeEvent[]
+}
+
 export type LevelData = Record<number, Record<string, unknown>>
 
 export interface LevelMeta {
@@ -38,7 +62,7 @@ export const LEVEL_META: LevelMeta[] = [
 ]
 
 export interface GraphNodeData extends Record<string, unknown> {
-  kind: 'level' | 'entity'
+  kind: 'level' | 'entity' | 'event'
   level: number
   label: string
   field?: string
@@ -47,4 +71,7 @@ export interface GraphNodeData extends Record<string, unknown> {
   color?: string
   entityCount?: number
   isDirty?: boolean
+  eventType?: NarrativeEventType
+  version?: string
+  idea?: string | null
 }

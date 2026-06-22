@@ -1,4 +1,4 @@
-import type { LevelData, StoryState } from '../types'
+import type { LevelData, NarrativeTimeline, StoryState } from '../types'
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
@@ -13,6 +13,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<{ status: string }>('/health'),
+
+  listProjects: () => request<string[]>('/api/stories'),
 
   listStories: () => request<string[]>('/api/stories'),
 
@@ -32,6 +34,11 @@ export const api = {
   getAllLevels: (storyName: string, version: string) =>
     request<LevelData>(
       `/api/story/${encodeURIComponent(storyName)}/versions/${encodeURIComponent(version)}/all`,
+    ),
+
+  getNarrative: (storyName: string, version: string) =>
+    request<NarrativeTimeline>(
+      `/api/story/${encodeURIComponent(storyName)}/versions/${encodeURIComponent(version)}/narrative`,
     ),
 
   injectIdea: (storyName: string, idea: string) =>

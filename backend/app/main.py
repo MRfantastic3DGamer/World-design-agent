@@ -11,6 +11,7 @@ from app.config import DEFAULT_STORY_CONFIG, LEVEL_NAMES
 from app.models.api import HITLRequest, HITLStatus, InjectIdeaRequest, InitStoryRequest, StoryStateResponse
 from app.models.state import WorldState
 from app.services.hitl import apply_hitl_gate
+from app.services.narrative import build_narrative_timeline
 from app.services.session import registry
 from app.persistence import StorageManager
 
@@ -118,6 +119,15 @@ def list_story_versions(story_name: str) -> List[str]:
 def get_all_levels(story_name: str, version_id: str) -> Dict[int, Any]:
   _require_story(story_name)
   return storage.read_all_levels(story_name, version_id, resolve_refs=True)
+
+
+@app.get("/api/story/{story_name}/versions/{version_id}/narrative")
+def get_narrative_timeline(story_name: str, version_id: str) -> Dict[str, Any]:
+  _require_story(story_name)
+  try:
+    return build_narrative_timeline(storage, story_name, version_id)
+  except ValueError as exc:
+    raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/story/{story_name}/state", response_model=StoryStateResponse)

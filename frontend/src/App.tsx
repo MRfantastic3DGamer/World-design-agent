@@ -2,95 +2,82 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Node } from '@xyflow/react'
 
 import { api } from './api/client'
+import { NarrativeTimeline } from './components/NarrativeTimeline'
 import { NodeDetailPanel } from './components/NodeDetailPanel'
+import { ProjectToolbar } from './components/ProjectToolbar'
 import { StoryCanvas } from './components/StoryCanvas'
-import { StoryToolbar } from './components/StoryToolbar'
 import { WorkflowPanel } from './components/WorkflowPanel'
-import type { GraphNodeData, LevelData, StoryState } from './types'
+import type { GraphNodeData, LevelData, NarrativeEvent, NarrativeTimeline as NarrativeData, StoryState } from './types'
+import { latestVersion } from './utils/version'
 
 export default function App() {
-  const [stories, setStories] = useState<string[]>([])
-  const [storyName, setStoryName] = useState('')
+  const [projects, setProjects] = useState<string[]>([])
+  const [projectName, setProjectName] = useState('')
   const [versions, setVersions] = useState<string[]>([])
   const [version, setVersion] = useState('')
+  const [latest, setLatest] = useState('v1')
   const [levelData, setLevelData] = useState<LevelData>({})
+  const [narrative, setNarrative] = useState<NarrativeData | null>(null)
   const [storyState, setStoryState] = useState<StoryState | null>(null)
   const [selectedNode, setSelectedNode] = useState<Node<GraphNodeData> | null>(null)
-  const [newStoryName, setNewStoryName] = useState('')
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const loadStories = useCallback(async () => {
-    const names = await api.listStories()
-    setStories(names)
+  const loadProjects = useCallback(async () => {
+    const names = await api.listProjects()
+    setProjects(names)
     return names
   }, [])
 
-  const loadStoryBundle = useCallback(async (name: string, preferredVersion?: string) => {
-    const [vers, state] = await Promise.all([
-      api.listVersions(name),
-      api.getStoryState(name),
+  const loadProjectBundle = useCallback(async (name: string, preferredVersion?: string) => {
+    const vers = await api.listVersions(name)
+    const newest = latestVersion(vers)
+    const activeVersion = preferredVersion && vers.includes(preferredVersion) ? preferredVersion : newest
+
+    const [levels, timeline, state] = await Promise.all([
+      api.getAllLevels(name, activeVersion),
+      api.getNarrative(name, activeVersion),
+      api.getStoryState(name).catch(() => null),
     ])
-    const activeVersion = preferredVersion ?? state.current_version ?? vers.at(-1) ?? 'v1'
-    const levels = await api.getAllLevels(name, activeVersion)
 
     setVersions(vers)
+    setLatest(newest)
     setVersion(activeVersion)
     setLevelData(levels)
+    setNarrative(timeline)
     setStoryState(state)
+    setSelectedEventId(null)
+    setSelectedNode(null)
   }, [])
 
   useEffect(() => {
-    loadStories().catch((err: Error) => setError(err.message))
-  }, [loadStories])
+    loadProjects().catch((err: Error) => setError(err.message))
+  }, [loadProjects])
 
   useEffect(() => {
-    if (!storyName) return
+    if (!projectName) return
     setLoading(true)
     setError(null)
-    loadStoryBundle(storyName)
+    loadProjectBundle(projectName)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [storyName, loadStoryBundle])
-
-  const handleCreateStory = async () => {
-    const name = newStoryName.trim()
-    if (!name) return
-    setLoading(true)
-    setError(null)
-    try {
-      await api.initStory(name)
-      await loadStories()
-      setStoryName(name)
-      setNewStoryName('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create story')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleRefresh = async () => {
-    if (!storyName) return
-    setLoading(true)
-    setError(null)
-    try {
-      await loadStoryBundle(storyName, version)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to refresh')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [projectName, loadProjectBundle])
 
   const handleVersionChange = async (nextVersion: string) => {
-    if (!storyName) return
+    if (!projectName) return
     setVersion(nextVersion)
     setLoading(true)
     setError(null)
     try {
-      const levels = await api.getAllLevels(storyName, nextVersion)
+      const [levels, timeline] = await Promise.all([
+        api.getAllLevels(projectName, nextVersion),
+        api.getNarrative(projectName, nextVersion),
+      ])
       setLevelData(levels)
+      setNarrative(timeline)
+      setSelectedEventId(null)
+      setSelectedNode(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load version')
     } finally {
@@ -98,12 +85,25 @@ export default function App() {
     }
   }
 
-  const handleInject = async (idea: string) => {
-    if (!storyName) return
+  const handleRefresh = async () => {
+    if (!projectName) return
     setLoading(true)
     setError(null)
     try {
-      const state = await api.injectIdea(storyName, idea)
+      await loadProjectBundle(projectName, version)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleInject = async (idea: string) => {
+    if (!projectName) return
+    setLoading(true)
+    setError(null)
+    try {
+      const state = await api.injectIdea(projectName, idea)
       setStoryState(state)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to inject idea')
@@ -117,16 +117,16 @@ export default function App() {
     status: 'approved' | 'rejected' | 'modify',
     steering?: string,
   ) => {
-    if (!storyName) return
+    if (!projectName) return
     setLoading(true)
     setError(null)
     try {
-      const state = await api.hitl(storyName, gate, {
+      const state = await api.hitl(projectName, gate, {
         status,
         steering_prompt: steering,
       })
       setStoryState(state)
-      await loadStoryBundle(storyName, state.current_version)
+      await loadProjectBundle(projectName, state.current_version)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'HITL action failed')
     } finally {
@@ -134,52 +134,90 @@ export default function App() {
     }
   }
 
+  const handleSelectEvent = (eventId: string | null) => {
+    setSelectedEventId(eventId)
+    if (!eventId || !narrative) {
+      setSelectedNode(null)
+      return
+    }
+    const event = narrative.events.find((item: NarrativeEvent) => item.id === eventId)
+    if (event) {
+      setSelectedNode({
+        id: event.id,
+        type: 'eventNode',
+        position: { x: 0, y: 0 },
+        data: {
+          kind: 'event',
+          level: event.level,
+          label: event.idea ?? 'Event',
+          payload: event,
+          summary: event.summary ?? undefined,
+          eventType: event.type,
+          version: event.version,
+          idea: event.idea,
+        },
+      })
+    }
+  }
+
+  const events: NarrativeEvent[] = narrative?.events ?? []
+
   return (
     <div className="app-shell">
-      <StoryToolbar
-        stories={stories}
-        storyName={storyName}
+      <ProjectToolbar
+        projects={projects}
+        projectName={projectName}
         versions={versions}
         version={version}
-        storyState={storyState}
+        latestVersion={latest}
         loading={loading}
-        newStoryName={newStoryName}
-        onStoryChange={setStoryName}
+        onProjectChange={setProjectName}
         onVersionChange={handleVersionChange}
-        onNewStoryNameChange={setNewStoryName}
-        onCreateStory={handleCreateStory}
         onRefresh={handleRefresh}
       />
 
       {error ? <div className="banner banner--error">{error}</div> : null}
 
-      <main className="app-main">
+      <main className="app-main app-main--reader">
+        <aside className="reader-sidebar">
+          <NarrativeTimeline
+            events={events}
+            selectedEventId={selectedEventId}
+            onSelectEvent={handleSelectEvent}
+          />
+          <details className="workflow-drawer">
+            <summary>Workflow controls</summary>
+            <WorkflowPanel
+              storyName={projectName}
+              storyState={storyState}
+              loading={loading}
+              onInject={handleInject}
+              onHitl={handleHitl}
+            />
+          </details>
+        </aside>
+
         <section className="canvas-column">
-          {storyName && Object.keys(levelData).length > 0 ? (
+          {projectName && Object.keys(levelData).length > 0 ? (
             <StoryCanvas
               levelData={levelData}
               dirtyNodes={storyState?.dirty_nodes ?? []}
+              events={events}
+              highlightedEventId={selectedEventId}
               onSelectNode={setSelectedNode}
             />
           ) : (
             <div className="canvas-placeholder">
-              <h2>Story node graph</h2>
+              <h2>Read your world as a graph</h2>
               <p>
-                Pick a story to visualize all five worldbuilding levels — from axioms down to
-                nano-scale environmental detail — as an interactive hierarchy.
+                Select a project to explore all five levels — from axioms to nano detail — with a
+                causal timeline showing how each simulation shaped the story.
               </p>
             </div>
           )}
         </section>
 
-        <aside className="sidebar">
-          <WorkflowPanel
-            storyName={storyName}
-            storyState={storyState}
-            loading={loading}
-            onInject={handleInject}
-            onHitl={handleHitl}
-          />
+        <aside className="inspector-sidebar">
           <NodeDetailPanel node={selectedNode} />
         </aside>
       </main>

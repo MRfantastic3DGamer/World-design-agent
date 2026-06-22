@@ -1,14 +1,15 @@
-# World Graph UI
+# Story Reader UI
 
-Vite + React frontend for visualizing the worldbuilding engine story hierarchy on an interactive node-graph canvas.
+Vite + React UI for reading worldbuilding projects as an interactive graph with a causal timeline.
 
 ## Features
 
-- **5-level story canvas** — Axioms → Macro → Meso → Micro → Nano as a vertical node graph
-- **Entity nodes** — Array fields (factions, locations, laws, etc.) rendered as child nodes
-- **Inspector panel** — Click any node to view full JSON payload
-- **Version switching** — Browse any committed story version
-- **Workflow controls** — Inject ideas and approve/modify/reject HITL gates
+- **Project picker** — select any story project from storage
+- **Version picker** — latest version selected by default; older versions available for historical reading
+- **World graph** — five hierarchical levels (Axioms → Nano) with entity child nodes
+- **How it happened** — left sidebar timeline of simulation cycles and retcon escalations
+- **Causal edges** — dashed/animated links from timeline events to the levels they shaped
+- **Inspector** — click any node or timeline step to read full JSON details
 
 ## Setup
 
@@ -26,8 +27,6 @@ npm run dev
 ```
 
 Open http://localhost:5173
-
-The Vite dev server proxies `/api` and `/health` to the backend on port 8000.
 
 ## Stack
 
