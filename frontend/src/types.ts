@@ -46,6 +46,8 @@ export interface NarrativeTimeline {
 
 export type LevelData = Record<number, Record<string, unknown>>
 
+export type StoryConfig = Record<string, unknown>
+
 export interface LevelMeta {
   level: number
   name: string

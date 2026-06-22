@@ -1,14 +1,29 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Node } from '@xyflow/react'
 
-import { api } from './api/client'
+import { api, type InitStoryBody } from './api/client'
+import { ConfigPanel } from './components/ConfigPanel'
+import { InitProjectPanel } from './components/InitProjectPanel'
+import { LevelJsonPanel } from './components/LevelJsonPanel'
 import { NarrativeTimeline } from './components/NarrativeTimeline'
 import { NodeDetailPanel } from './components/NodeDetailPanel'
 import { ProjectToolbar } from './components/ProjectToolbar'
+import { StatePanel } from './components/StatePanel'
 import { StoryCanvas } from './components/StoryCanvas'
 import { WorkflowPanel } from './components/WorkflowPanel'
 import type { GraphNodeData, LevelData, NarrativeEvent, NarrativeTimeline as NarrativeData, StoryState } from './types'
 import { latestVersion } from './utils/version'
+
+type SidebarTab = 'create' | 'workflow' | 'timeline' | 'state' | 'config' | 'level'
+
+const SIDEBAR_TABS: Array<{ id: SidebarTab; label: string; tip: string }> = [
+  { id: 'create', label: 'Create', tip: 'POST /api/story/init — scaffold a new project' },
+  { id: 'workflow', label: 'Workflow', tip: 'Inject ideas and HITL gates' },
+  { id: 'timeline', label: 'Timeline', tip: 'Narrative history up to selected version' },
+  { id: 'state', label: 'State', tip: 'GET /api/story/{name}/state' },
+  { id: 'config', label: 'Config', tip: 'GET /api/story/{name}/config' },
+  { id: 'level', label: 'Level JSON', tip: 'GET single level JSON with ref resolution' },
+]
 
 export default function App() {
   const [projects, setProjects] = useState<string[]>([])
@@ -23,6 +38,17 @@ export default function App() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [backendOk, setBackendOk] = useState<boolean | null>(null)
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('create')
+
+  const checkHealth = useCallback(async () => {
+    try {
+      const result = await api.health()
+      setBackendOk(result.status === 'ok')
+    } catch {
+      setBackendOk(false)
+    }
+  }, [])
 
   const loadProjects = useCallback(async () => {
     const names = await api.listProjects()
@@ -52,8 +78,9 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    checkHealth()
     loadProjects().catch((err: Error) => setError(err.message))
-  }, [loadProjects])
+  }, [checkHealth, loadProjects])
 
   useEffect(() => {
     if (!projectName) return
@@ -63,6 +90,22 @@ export default function App() {
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
   }, [projectName, loadProjectBundle])
+
+  const handleCreateProject = async (payload: InitStoryBody) => {
+    setLoading(true)
+    setError(null)
+    try {
+      await api.initStory(payload)
+      await loadProjects()
+      setProjectName(payload.story_name)
+      setSidebarTab('workflow')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create project')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleVersionChange = async (nextVersion: string) => {
     if (!projectName) return
@@ -90,9 +133,24 @@ export default function App() {
     setLoading(true)
     setError(null)
     try {
+      await checkHealth()
+      await loadProjects()
       await loadProjectBundle(projectName, version)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRefreshState = async () => {
+    if (!projectName) return
+    setLoading(true)
+    try {
+      const state = await api.getStoryState(projectName)
+      setStoryState(state)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load state')
     } finally {
       setLoading(false)
     }
@@ -105,6 +163,7 @@ export default function App() {
     try {
       const state = await api.injectIdea(projectName, idea)
       setStoryState(state)
+      setSidebarTab('state')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to inject idea')
     } finally {
@@ -116,6 +175,7 @@ export default function App() {
     gate: 'routing' | 'presim' | 'postsim',
     status: 'approved' | 'rejected' | 'modify',
     steering?: string,
+    manualOverride?: Record<string, unknown>,
   ) => {
     if (!projectName) return
     setLoading(true)
@@ -124,6 +184,7 @@ export default function App() {
       const state = await api.hitl(projectName, gate, {
         status,
         steering_prompt: steering,
+        manual_override_data: manualOverride,
       })
       setStoryState(state)
       await loadProjectBundle(projectName, state.current_version)
@@ -171,6 +232,7 @@ export default function App() {
         version={version}
         latestVersion={latest}
         loading={loading}
+        backendOk={backendOk}
         onProjectChange={setProjectName}
         onVersionChange={handleVersionChange}
         onRefresh={handleRefresh}
@@ -180,21 +242,53 @@ export default function App() {
 
       <main className="app-main app-main--reader">
         <aside className="reader-sidebar">
-          <NarrativeTimeline
-            events={events}
-            selectedEventId={selectedEventId}
-            onSelectEvent={handleSelectEvent}
-          />
-          <details className="workflow-drawer">
-            <summary>Workflow controls</summary>
-            <WorkflowPanel
-              storyName={projectName}
-              storyState={storyState}
-              loading={loading}
-              onInject={handleInject}
-              onHitl={handleHitl}
-            />
-          </details>
+          <nav className="sidebar-tabs" aria-label="API panels">
+            {SIDEBAR_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`sidebar-tabs__btn ${sidebarTab === tab.id ? 'sidebar-tabs__btn--active' : ''}`}
+                onClick={() => setSidebarTab(tab.id)}
+                title={tab.tip}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="sidebar-panel">
+            {sidebarTab === 'create' ? (
+              <InitProjectPanel loading={loading} onCreate={handleCreateProject} />
+            ) : null}
+            {sidebarTab === 'workflow' ? (
+              <WorkflowPanel
+                storyName={projectName}
+                storyState={storyState}
+                loading={loading}
+                onInject={handleInject}
+                onHitl={handleHitl}
+              />
+            ) : null}
+            {sidebarTab === 'timeline' ? (
+              <NarrativeTimeline
+                events={events}
+                selectedEventId={selectedEventId}
+                onSelectEvent={handleSelectEvent}
+              />
+            ) : null}
+            {sidebarTab === 'state' ? (
+              <StatePanel
+                storyState={storyState}
+                projectName={projectName}
+                onRefresh={handleRefreshState}
+                loading={loading}
+              />
+            ) : null}
+            {sidebarTab === 'config' ? <ConfigPanel projectName={projectName} loading={loading} /> : null}
+            {sidebarTab === 'level' ? (
+              <LevelJsonPanel projectName={projectName} version={version} loading={loading} />
+            ) : null}
+          </div>
         </aside>
 
         <section className="canvas-column">
@@ -210,8 +304,9 @@ export default function App() {
             <div className="canvas-placeholder">
               <h2>Read your world as a graph</h2>
               <p>
-                Select a project to explore all five levels — from axioms to nano detail — with a
-                causal timeline showing how each simulation shaped the story.
+                Use the <strong>Create</strong> tab to scaffold a project, or select an existing one.
+                The graph shows all five levels with a causal timeline of how each simulation shaped
+                the story.
               </p>
             </div>
           )}

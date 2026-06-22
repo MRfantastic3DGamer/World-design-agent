@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import DEFAULT_STORY_CONFIG, LEVEL_NAMES
+from app.config import DEFAULT_LEVEL_PAYLOADS, DEFAULT_STORY_CONFIG, LEVEL_NAMES
 from app.models.api import HITLRequest, HITLStatus, InjectIdeaRequest, InitStoryRequest, StoryStateResponse
 from app.models.state import WorldState
 from app.services.hitl import apply_hitl_gate
@@ -59,6 +59,21 @@ def _require_state(story_name: str) -> WorldState:
 @app.get("/health")
 def health() -> Dict[str, str]:
   return {"status": "ok"}
+
+
+@app.get("/api/defaults")
+def get_defaults() -> Dict[str, Any]:
+  return {
+    "config": DEFAULT_STORY_CONFIG,
+    "levels": DEFAULT_LEVEL_PAYLOADS,
+    "level_names": LEVEL_NAMES,
+  }
+
+
+@app.get("/api/story/{story_name}/config")
+def get_story_config(story_name: str) -> Dict[str, Any]:
+  _require_story(story_name)
+  return storage.read_config(story_name)
 
 
 @app.post("/api/story/init", response_model=StoryStateResponse)

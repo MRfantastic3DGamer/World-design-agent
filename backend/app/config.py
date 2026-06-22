@@ -22,3 +22,37 @@ DEFAULT_STORY_CONFIG = {
     "simulation_directors": {"provider": "ollama", "model": "mistral:instruct"},
     "evaluator": {"provider": "openai", "model": "gpt-4o-mini"},
 }
+
+DEFAULT_LEVEL_PAYLOADS: dict[int, dict] = {
+    0: {
+        "physical_laws": [],
+        "magic_rules": [],
+        "ecosystem_limits": [],
+        "restricted_tags": ["RESTRICTED_TECH", "MAGIC_DEAD_ZONE"],
+    },
+    1: {
+        "global_history": [],
+        "geopolitics": [],
+        "geography": [],
+        "cataclysms": [],
+    },
+    2: {
+        "factions": [],
+        "cultures": [],
+        "resources": [],
+        "ideologies": [],
+        "restricted_tags": ["RESTRICTED_TECH", "MAGIC_DEAD_ZONE"],
+    },
+    3: {
+        "locations": [],
+        "daily_life": [],
+        "trade": [],
+        "technology": [],
+        "personas": [],
+    },
+    4: {
+        "environmental_details": [],
+        "wear_and_tear": [],
+        "physical_decay": [],
+    },
+}

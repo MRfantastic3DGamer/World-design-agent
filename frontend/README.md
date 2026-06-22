@@ -1,34 +1,41 @@
 # Story Reader UI
 
-Vite + React UI for reading worldbuilding projects as an interactive graph with a causal timeline.
+Vite + React UI with **full API coverage** for the worldbuilding engine.
 
-## Features
+## API panels (sidebar tabs)
 
-- **Project picker** — select any story project from storage
-- **Version picker** — latest version selected by default; older versions available for historical reading
-- **World graph** — five hierarchical levels (Axioms → Nano) with entity child nodes
-- **How it happened** — left sidebar timeline of simulation cycles and retcon escalations
-- **Causal edges** — dashed/animated links from timeline events to the levels they shaped
-- **Inspector** — click any node or timeline step to read full JSON details
+| Tab | Endpoint(s) | Purpose |
+|-----|-------------|---------|
+| **Create** | `POST /api/story/init`, `GET /api/defaults` | Project name, optional LLM config JSON, optional per-level seed JSON |
+| **Workflow** | `POST /inject`, `POST /hitl/*` | Inject ideas, steering prompts, manual override JSON |
+| **Timeline** | `GET /versions/{v}/narrative` | How simulations shaped the story |
+| **State** | `GET /state` | Live workflow / HITL status |
+| **Config** | `GET /config` | Per-project LLM routing |
+| **Level JSON** | `GET /versions/{v}/{level}` | Single resolved level file |
+
+Toolbar also uses `GET /api/stories`, `GET /versions`, `GET /versions/{v}/all`, and `GET /health`.
+
+## Tooltips
+
+Hover the **?** icon next to labels for field-level help. Tab buttons include endpoint hints in their `title` attribute.
 
 ## Setup
 
 ```bash
-# Terminal 1 — backend
-cd backend
-pip install -e .
-export WORLD_ENGINE_MOCK_LLM=1
-uvicorn app.main:app --reload --port 8000
+# Backend
+cd backend && pip install -e . && WORLD_ENGINE_MOCK_LLM=1 uvicorn app.main:app --reload
 
-# Terminal 2 — frontend
-cd frontend
-npm install
-npm run dev
+# Frontend
+cd frontend && npm install && npm run dev
 ```
 
 Open http://localhost:5173
 
-## Stack
+## Create a project
 
-- Vite + React + TypeScript
-- [@xyflow/react](https://reactflow.dev/) for the node graph canvas
+1. Open the **Create** tab
+2. Enter a project name (`a-z`, `0-9`, `_`, `-`)
+3. Optionally enable **Custom LLM config** or **Seed initial level JSON**
+4. Click **Create project**
+
+Latest version is selected automatically when you open a project.

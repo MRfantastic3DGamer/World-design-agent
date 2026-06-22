@@ -1,6 +1,7 @@
 import type { Node } from '@xyflow/react'
 import type { GraphNodeData } from '../types'
 import { LEVEL_META } from '../types'
+import { HelpTip } from './HelpTip'
 
 interface NodeDetailPanelProps {
   node: Node<GraphNodeData> | null
@@ -9,8 +10,10 @@ interface NodeDetailPanelProps {
 export function NodeDetailPanel({ node }: NodeDetailPanelProps) {
   if (!node) {
     return (
-      <aside className="detail-panel detail-panel--empty">
-        <h2>Inspector</h2>
+      <aside className="panel detail-panel detail-panel--empty">
+        <h2>
+          Inspector <HelpTip text="Shows the full JSON payload for the selected canvas or timeline node." />
+        </h2>
         <p>Select a timeline event, level, or entity on the canvas to read its details.</p>
       </aside>
     )
@@ -20,7 +23,7 @@ export function NodeDetailPanel({ node }: NodeDetailPanelProps) {
   const isEvent = node.data.kind === 'event'
 
   return (
-    <aside className="detail-panel">
+    <aside className="panel detail-panel">
       <div className="detail-panel__header">
         <span
           className="detail-panel__badge"

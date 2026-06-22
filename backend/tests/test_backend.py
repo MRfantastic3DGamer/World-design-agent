@@ -35,6 +35,19 @@ def test_narrative_timeline_endpoint(client: TestClient):
   assert body["events"] == []
 
 
+def test_defaults_and_config_endpoints(client: TestClient):
+  defaults = client.get("/api/defaults")
+  assert defaults.status_code == 200
+  body = defaults.json()
+  assert "config" in body
+  assert "levels" in body
+
+  client.post("/api/story/init", json={"story_name": "cfg_story"})
+  config = client.get("/api/story/cfg_story/config")
+  assert config.status_code == 200
+  assert "router" in config.json()
+
+
 def test_init_story(client: TestClient):
   response = client.post("/api/story/init", json={"story_name": "test_world"})
   assert response.status_code == 200

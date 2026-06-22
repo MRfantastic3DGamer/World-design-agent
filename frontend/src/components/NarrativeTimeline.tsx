@@ -1,4 +1,5 @@
 import type { NarrativeEvent } from '../types'
+import { HelpTip } from './HelpTip'
 import { LEVEL_META } from '../types'
 
 interface NarrativeTimelineProps {
@@ -14,17 +15,25 @@ export function NarrativeTimeline({
 }: NarrativeTimelineProps) {
   if (events.length === 0) {
     return (
-      <section className="narrative-timeline narrative-timeline--empty">
-        <h3>How it happened</h3>
-        <p>No simulation cycles recorded for this version yet. Approve a workflow run to build history.</p>
+      <section className="panel narrative-timeline narrative-timeline--empty">
+        <h3>
+          How it happened{' '}
+          <HelpTip text="Chronological events from GET /api/story/{name}/versions/{version}/narrative." />
+        </h3>
+        <p>No simulation cycles recorded for this version yet. Run a workflow and approve post-sim to build history.</p>
       </section>
     )
   }
 
   return (
-    <section className="narrative-timeline">
-      <h3>How it happened</h3>
-      <p className="narrative-timeline__hint">Chronological causes that shaped each level</p>
+    <section className="panel narrative-timeline">
+      <h3>
+        How it happened <HelpTip text="Events from all versions up to and including the selected version." />
+      </h3>
+      <p className="panel__intro">
+        Click a step to highlight its event node on the canvas. Solid border = simulation; red = retcon
+        escalation.
+      </p>
       <ol className="narrative-timeline__list">
         {events.map((event, index) => {
           const levelLabel = LEVEL_META.find((meta) => meta.level === event.level)?.label
