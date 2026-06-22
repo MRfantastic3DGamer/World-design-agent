@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import DEFAULT_STORY_CONFIG, LEVEL_NAMES
 from app.models.api import HITLRequest, HITLStatus, InjectIdeaRequest, InitStoryRequest, StoryStateResponse
@@ -14,6 +15,13 @@ from app.services.session import registry
 from app.persistence import StorageManager
 
 app = FastAPI(title="Worldbuilding Engine", version="0.1.0")
+app.add_middleware(
+  CORSMiddleware,
+  allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+  allow_credentials=True,
+  allow_methods=["*"],
+  allow_headers=["*"],
+)
 storage = StorageManager()
 registry.set_storage(storage)
 
@@ -89,9 +97,41 @@ def inject_idea(story_name: str, request: InjectIdeaRequest) -> StoryStateRespon
   return _state_to_response(state)
 
 
+@app.get("/api/stories")
+def list_stories() -> List[str]:
+  if not storage.root.exists():
+    return []
+  return sorted(
+    p.name
+    for p in storage.root.iterdir()
+    if p.is_dir() and not p.name.startswith(".")
+  )
+
+
+@app.get("/api/story/{story_name}/versions")
+def list_story_versions(story_name: str) -> List[str]:
+  _require_story(story_name)
+  return storage.list_versions(story_name)
+
+
+@app.get("/api/story/{story_name}/versions/{version_id}/all")
+def get_all_levels(story_name: str, version_id: str) -> Dict[int, Any]:
+  _require_story(story_name)
+  return storage.read_all_levels(story_name, version_id, resolve_refs=True)
+
+
 @app.get("/api/story/{story_name}/state", response_model=StoryStateResponse)
 def get_story_state(story_name: str) -> StoryStateResponse:
-  state = _require_state(story_name)
+  _require_story(story_name)
+  state = registry.get_state(story_name)
+  if state is None:
+    versions = storage.list_versions(story_name)
+    state = {
+      "story_name": story_name,
+      "current_version": versions[-1] if versions else "v1",
+      "hitl_status": "IDLE",
+      "dirty_nodes": [],
+    }
   return _state_to_response(state)
 
 
